@@ -35,7 +35,7 @@ fn get_file_list(path: &str, account_id: &str) -> FileList {
         let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
         let mut file_key: Vec<&str> = file_name.split('.').collect();
         file_key.pop();
-        let fkey = file_key.join("");
+        let fkey = file_key.join(".");
         let key = format!("{account_id}/widget/{fkey}");
         let mut file = fs::File::open(&file_path).unwrap();
         let mut contents = String::new();
