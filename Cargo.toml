@@ -32,6 +32,7 @@ targets = [
   "x86_64-pc-windows-msvc",
   "aarch64-apple-darwin",
 ]
+installers = ["shell", "powershell"]
 
 [workspace.metadata.release]
 publish = false
