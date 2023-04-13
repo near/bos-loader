@@ -2,6 +2,7 @@
 name = "bos-loader"
 version = "0.2.0"
 edition = "2021"
+repository = "https://github.com/mpeterdev/bos-loader"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
