@@ -3,12 +3,15 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
+use std::path::PathBuf;
 use warp::{http::Method, Filter};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
     account_id: String,
+    #[clap(short, long, default_value = ".")]
+    path: PathBuf,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -21,20 +24,30 @@ struct ComponentCode {
     code: String,
 }
 
-fn handle_request(account_id: &str) -> FileList {
-    let path = "./src"; // replace with your local directory path
+fn handle_request(account_id: &str, path: PathBuf) -> FileList {
+    // let path = "./src"; // replace with your local directory path
     let file_list = get_file_list(path, account_id);
     file_list
 }
 
-fn get_file_list(path: &str, account_id: &str) -> FileList {
+fn get_file_list(path: PathBuf, account_id: &str) -> FileList {
     let mut components = HashMap::new();
     let paths = fs::read_dir(path).unwrap();
     for path in paths {
         let file_path = path.unwrap().path();
         let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
         let mut file_key: Vec<&str> = file_name.split('.').collect();
-        file_key.pop();
+        let extension = file_key.pop();
+
+        match extension {
+            Some("jsx") => println!("Last element of array is equal to 'jsx'"),
+            Some("tsx") => println!("Last element of array is equal to 'tsx'"),
+            _ => {
+                println!("Skipping {file_name}");
+                continue;
+            }
+        }
+
         let fkey = file_key.join(".");
         let key = format!("{account_id}/widget/{fkey}");
         let mut file = fs::File::open(&file_path).unwrap();
@@ -49,16 +62,24 @@ fn get_file_list(path: &str, account_id: &str) -> FileList {
 async fn main() {
     let args = Args::parse();
 
+    let serve_path = args.path.clone();
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_methods(&[Method::GET]);
     let api = warp::get()
         .map(move || {
             let account = args.account_id.to_owned();
-            let files = handle_request(&account);
+            let path = args.path.to_owned();
+            let files = handle_request(&account, path);
             warp::reply::json(&files)
         })
         .with(cors);
 
     warp::serve(api).run(([127, 0, 0, 1], 3030)).await;
+
+    println!(
+        "Files in {} ending in .jsx or .tsx will be served",
+        serve_path.display()
+    );
 }
