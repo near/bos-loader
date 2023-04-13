@@ -6,6 +6,10 @@ Serves a local directory of component files as a JSON payload properly formatted
 
 Currently, you must run a viewer instance yourself locally. See [Local Component Development](https://github.com/near/near-discovery#local-component-development)
 
+## Installation
+
+see GitHub Releases
+
 ## Usage
 
 ```sh
