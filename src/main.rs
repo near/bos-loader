@@ -25,7 +25,6 @@ struct ComponentCode {
 }
 
 fn handle_request(account_id: &str, path: PathBuf) -> FileList {
-    // let path = "./src"; // replace with your local directory path
     let file_list = get_file_list(path, account_id);
     file_list
 }
@@ -40,12 +39,9 @@ fn get_file_list(path: PathBuf, account_id: &str) -> FileList {
         let extension = file_key.pop();
 
         match extension {
-            Some("jsx") => println!("Last element of array is equal to 'jsx'"),
-            Some("tsx") => println!("Last element of array is equal to 'tsx'"),
-            _ => {
-                println!("Skipping {file_name}");
-                continue;
-            }
+            Some("jsx") => {}
+            Some("tsx") => {}
+            _ => continue,
         }
 
         let fkey = file_key.join(".");
@@ -76,10 +72,10 @@ async fn main() {
         })
         .with(cors);
 
-    warp::serve(api).run(([127, 0, 0, 1], 3030)).await;
-
     println!(
-        "Files in {} ending in .jsx or .tsx will be served",
+        "\nFiles in {} ending in .jsx or .tsx will be served\n",
         serve_path.display()
     );
+
+    warp::serve(api).run(([127, 0, 0, 1], 3030)).await;
 }
