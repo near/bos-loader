@@ -2,6 +2,8 @@
 
 Serves a local directory of component files as a JSON payload properly formatted to be plugged into a BOS `redirectMap`. When paired with a viewer configured to call out to this loader, it enables local component development—especially when working on multiple components in parallel.
 
+Works best when paired with [FroVolod/near-social](https://github.com/FroVolod/near-social) for component syncing and CI/CD
+
 ## Requirements
 
 Currently, you must run a viewer instance yourself locally. See [Local Component Development](https://github.com/near/near-discovery#local-component-development)
