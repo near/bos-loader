@@ -25,16 +25,31 @@ struct ComponentCode {
 }
 
 fn handle_request(account_id: &str, path: PathBuf) -> FileList {
-    let file_list = get_file_list(path, account_id);
-    file_list
+    let mut components = HashMap::new();
+    get_file_list(&path, account_id, &mut components, String::from(""));
+    FileList { components }
 }
 
-fn get_file_list(path: PathBuf, account_id: &str) -> FileList {
-    let mut components = HashMap::new();
+fn get_file_list(
+    path: &PathBuf,
+    account_id: &str,
+    components: &mut HashMap<String, ComponentCode>,
+    prefix: String,
+) {
     let paths = fs::read_dir(path).unwrap();
-    for path in paths {
-        let file_path = path.unwrap().path();
+    for path_res in paths {
+        let path = path_res.unwrap();
+        let file_path = path.path();
         let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
+        if path.file_type().unwrap().is_dir() {
+            get_file_list(
+                &file_path,
+                account_id,
+                components,
+                prefix.to_owned() + &file_name + ".",
+            );
+            continue;
+        }
         let mut file_key: Vec<&str> = file_name.split('.').collect();
         let extension = file_key.pop();
 
@@ -45,13 +60,12 @@ fn get_file_list(path: PathBuf, account_id: &str) -> FileList {
         }
 
         let fkey = file_key.join(".");
-        let key = format!("{account_id}/widget/{fkey}");
+        let key = format!("{account_id}/widget/{prefix}{fkey}");
         let mut file = fs::File::open(&file_path).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
         components.insert(key, ComponentCode { code: contents });
     }
-    FileList { components }
 }
 
 #[tokio::main]
