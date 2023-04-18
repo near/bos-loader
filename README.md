@@ -4,15 +4,13 @@ Serves a local directory of component files as a JSON payload properly formatted
 
 Works best when paired with [FroVolod/near-social](https://github.com/FroVolod/near-social) for component syncing and CI/CD
 
-## Requirements
-
-Currently, you must run a viewer instance yourself locally. See [Local Component Development](https://github.com/near/near-discovery#local-component-development)
-
 ## Installation
 
 see GitHub Releases
 
 ## Usage
+
+1. Run this tool with desired options
 
 ```sh
 Usage: bos-loader [OPTIONS] <ACCOUNT_ID>
@@ -45,6 +43,10 @@ results in
   }
 }
 ```
+
+2. Go to https://alpha.near.org/flags and set the BOS Loader URL to access your bos-loader instance. The default would be `http://127.0.0.1:3030`
+3. Load the component you would like to preview as `https://alpha.near.org/<account id>/widget/<component name>`
+   - e.g. from the previous example: `https://alpha.near.org/michaelpeter.near/widget/HelloWorld`
 
 ## Multi-device Testing
 
