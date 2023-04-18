@@ -7,10 +7,18 @@ use std::path::PathBuf;
 use warp::{http::Method, Filter};
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(
+    author,
+    version,
+    about,
+    long_about = "Serves the contents of BOS component files (.jsx) in a specified directory as a JSON object properly formatted for preview on a BOS gateway"
+)]
 struct Args {
+    /// NEAR account to use as component author in preview
     account_id: String,
-    #[clap(short, long, default_value = ".")]
+
+    /// Path to directory containing component files
+    #[clap(short, long, default_value = ".", value_hint = clap::ValueHint::DirPath)]
     path: PathBuf,
 }
 
