@@ -55,7 +55,7 @@ fn get_file_list(
 
         match extension {
             Some("jsx") => {}
-            Some("tsx") => {}
+            // Some("tsx") => {} // enable once tsx is supported
             _ => continue,
         }
 
@@ -87,7 +87,7 @@ async fn main() {
         .with(cors);
 
     println!(
-        "\nFiles in {} ending in .jsx or .tsx will be served\n",
+        "\nServing .jsx files in {} on http://127.0.0.1:3030\n",
         serve_path.display()
     );
 
