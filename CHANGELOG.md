@@ -1,5 +1,10 @@
 # Changelog
 
+# 0.5.0
+
+Add support for organizing `.` delimited component names into directories to be more compatible
+with the `near-social` CLI. e.g. `DIG.Button.jsx` → `DIG/Button.jsx`
+
 # 0.2.0
 
 Take optional path parameter, defaulting to the current directory (previously `./src`)
