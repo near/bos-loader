@@ -54,9 +54,9 @@ results in
 }
 ```
 
-2. Go to https://alpha.near.org/flags and set the BOS Loader URL to access your bos-loader instance. The default would be `http://127.0.0.1:3030`
-3. Load the component you would like to preview as `https://alpha.near.org/<account id>/widget/<component name>`
-   - e.g. from the previous example: `https://alpha.near.org/michaelpeter.near/widget/HelloWorld`
+2. Go to https://near.org/flags and set the BOS Loader URL to access your bos-loader instance. The default would be `http://127.0.0.1:3030`
+3. Load the component you would like to preview as `https://near.org/<account id>/widget/<component name>`
+   - e.g. from the previous example: `https://near.org/michaelpeter.near/widget/HelloWorld`
 
 ## Multi-device Testing
 
