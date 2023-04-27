@@ -60,21 +60,17 @@ results in
 
 ## Multi-device Testing
 
-Run both your viewer and loader behind [ngrok](https://ngrok.com/) to test on multiple devices or share your working copy with others!
+Run both your loader behind [ngrok](https://ngrok.com/) to test on multiple devices or share your working copy with others!
 
 Example ngrok config:
 
 ```yml
 authtoken: <automatically populated during setup>
 tunnels:
-  web:
-    proto: http
-    addr: 127.0.0.1:3000
-    subdomain: my-viewer # change this
   api:
     proto: http
     addr: 127.0.0.1:3030
-    subdomain: my-loader # change this and use in your viewer config
+    subdomain: my-loader # change this and use as your loader url e.g. https://my-loader.ngrok.io
 version: "2"
 region: us
 ```
