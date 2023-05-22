@@ -1,4 +1,5 @@
 use clap::Parser;
+use config::Config;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -15,11 +16,15 @@ use warp::{http::Method, Filter};
 )]
 struct Args {
     /// NEAR account to use as component author in preview
-    account_id: String,
+    account_id: Option<String>,
 
     /// Path to directory containing component files
     #[clap(short, long, default_value = ".", value_hint = clap::ValueHint::DirPath)]
     path: PathBuf,
+
+    /// Use config file (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
+    #[arg(short = 'c')]
+    use_config: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -32,10 +37,16 @@ struct ComponentCode {
     code: String,
 }
 
-fn handle_request(account_id: &str, path: PathBuf) -> FileList {
+#[derive(Serialize, Deserialize, Clone)]
+struct AccountPath {
+    account: String,
+    path: PathBuf,
+}
+
+fn handle_request(account_id: &str, path: PathBuf) -> HashMap<String, ComponentCode> {
     let mut components = HashMap::new();
     get_file_list(&path, account_id, &mut components, String::from(""));
-    FileList { components }
+    components
 }
 
 fn get_file_list(
@@ -80,23 +91,50 @@ fn get_file_list(
 async fn main() {
     let args = Args::parse();
 
-    let serve_path = args.path.clone();
+    let account_paths: Vec<AccountPath>;
+    if args.use_config {
+        let settings = Config::builder()
+            .add_source(config::File::with_name("./.bos-loader").required(false))
+            .build()
+            .expect("Failed to load config file");
+        account_paths = settings
+            .get::<Vec<AccountPath>>("paths")
+            .expect("A valid path configuration was not found in config file");
+    } else {
+        account_paths = vec![AccountPath {
+            account: args
+                .account_id
+                .expect("Account ID must be provided when not using configuration file")
+                .clone(),
+            path: args.path.clone(),
+        }];
+    }
 
+    let display_paths = account_paths.clone();
     let cors = warp::cors()
         .allow_any_origin()
         .allow_methods(&[Method::GET]);
     let api = warp::get()
         .map(move || {
-            let account = args.account_id.to_owned();
-            let path = args.path.to_owned();
-            let files = handle_request(&account, path);
-            warp::reply::json(&files)
+            let mut components: HashMap<String, ComponentCode> = HashMap::new();
+            for account_path in account_paths.iter() {
+                components.extend(handle_request(
+                    &account_path.account,
+                    account_path.path.to_owned(),
+                ));
+            }
+            warp::reply::json(&components)
         })
         .with(cors);
 
+    let display_paths_str = display_paths
+        .iter()
+        .map(|ap| format!("{} as account {}", ap.path.to_string_lossy(), ap.account))
+        .collect::<Vec<String>>()
+        .join("\n");
     println!(
-        "\nServing .jsx files in {} on http://127.0.0.1:3030\n",
-        serve_path.display()
+        "\nServing .jsx files on http://127.0.0.1:3030\n\n{}",
+        display_paths_str
     );
 
     warp::serve(api).run(([127, 0, 0, 1], 3030)).await;
