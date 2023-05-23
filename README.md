@@ -26,6 +26,11 @@ Options:
           Path to directory containing component files
 
           [default: .]
+  
+  -n, --network <mainnet | testnet>
+          Network the components should be tied to
+
+          [default: testnet]
 
   -h, --help
           Print help (see a summary with '-h')
