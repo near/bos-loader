@@ -50,17 +50,17 @@ struct AccountPath {
     path: PathBuf,
 }
 
-fn handle_request(account_id: &str, path: PathBuf, network: Network) -> HashMap<String, ComponentCode> {
+fn handle_request(account_id: &str, path: PathBuf, network: &Network) -> HashMap<String, ComponentCode> {
     let mut components = HashMap::new();
-    get_file_list(&path, account_id, &mut components, String::from(""), network.clone());
+    get_file_list(&path, account_id, &mut components, String::from(""), &network);
     components
 }
 
-fn replace_placeholders(code: &str, account_id: &str, network: Network) -> String {
+fn replace_placeholders(code: &str, account_id: &str, network: &Network) -> String {
     let mut replacements = HashMap::new();
     replacements.insert("${REPL_ACCOUNT}", account_id);
-    replacements.insert("${REPL_NEAR_URL}", if network == Network::Testnet {"test.near.org"} else {"near.org"});
-    replacements.insert("${REPL_NEAR_SOCIAL_ACCOUNT}", if network == Network::Testnet {"v1.social08.testnet"} else {"social.near"});
+    replacements.insert("${REPL_NEAR_URL}", if network == &Network::Testnet {"test.near.org"} else {"near.org"});
+    replacements.insert("${REPL_SOCIALDB_CONTRACT}", if network == &Network::Testnet {"v1.social08.testnet"} else {"social.near"});
 
     let mut modified_string = String::from(code);
 
@@ -76,7 +76,7 @@ fn get_file_list(
     account_id: &str,
     components: &mut HashMap<String, ComponentCode>,
     prefix: String,
-    network: Network
+    network: &Network
 ) {
     let paths = fs::read_dir(path).unwrap();
     for path_res in paths {
@@ -89,7 +89,7 @@ fn get_file_list(
                 account_id,
                 components,
                 prefix.to_owned() + &file_name + ".",
-                network.clone()
+                network
             );
             continue;
         }
@@ -107,7 +107,7 @@ fn get_file_list(
         let mut file = fs::File::open(&file_path).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
-        contents = replace_placeholders(contents.as_str(), account_id, network.clone());
+        contents = replace_placeholders(contents.as_str(), account_id, network);
         components.insert(key, ComponentCode { code: contents });
     }
 }
@@ -147,7 +147,7 @@ async fn main() {
                 components.extend(handle_request(
                     &account_path.account,
                     account_path.path.to_owned(),
-                    network.clone()
+                    &network
                 ));
             }
             warp::reply::json(&components)
@@ -173,30 +173,30 @@ mod tests {
 
     #[test]
     fn test_replace_placeholders_testnet() {
-        let input_string = String::from("<div> This is ${REPL_NEAR_SOCIAL_ACCOUNT} </div> <Widget src=\"${REPL_ACCOUNT}/widget/SomeWidget\"> <div>${REPL_NEAR_URL}</div>");
+        let input_string = String::from("<div> This is ${REPL_SOCIALDB_CONTRACT} </div> <Widget src=\"${REPL_ACCOUNT}/widget/SomeWidget\"> <div>${REPL_NEAR_URL}</div>");
         let expected_output = String::from("<div> This is v1.social08.testnet </div> <Widget src=\"MY_ACCOUNT/widget/SomeWidget\"> <div>test.near.org</div>");
 
-        let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", Network::Testnet);
+        let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", &Network::Testnet);
 
         assert_eq!(modified_string, expected_output);
     }
 
     #[test]
     fn test_replace_placeholders_mainnet() {
-        let input_string = String::from("<div> This is ${REPL_NEAR_SOCIAL_ACCOUNT} </div> <Widget src=\"${REPL_ACCOUNT}/widget/SomeWidget\"> <div>${REPL_NEAR_URL}</div>");
+        let input_string = String::from("<div> This is ${REPL_SOCIALDB_CONTRACT} </div> <Widget src=\"${REPL_ACCOUNT}/widget/SomeWidget\"> <div>${REPL_NEAR_URL}</div>");
         let expected_output = String::from("<div> This is social.near </div> <Widget src=\"MY_ACCOUNT/widget/SomeWidget\"> <div>near.org</div>");
 
-        let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", Network::Mainnet);
+        let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", &Network::Mainnet);
 
         assert_eq!(modified_string, expected_output);
     }
 
     #[test]
     fn test_replace_placeholders_wrong_notation() {
-        let input_string = String::from("${REPL_NEAR_SOCIAL_ACCOUNT REPL_ACCOUNT $REPL_ACCOUNT ${WRONG_PLACEHOLDER}");
+        let input_string = String::from("${REPL_SOCIALDB_CONTRACT REPL_ACCOUNT $REPL_ACCOUNT ${WRONG_PLACEHOLDER}");
         let expected_output = String::from(input_string.clone());
         
-        let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", Network::Testnet);
+        let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", &Network::Testnet);
 
         assert_eq!(modified_string, expected_output);
     }
