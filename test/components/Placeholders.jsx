@@ -1,5 +1,5 @@
 return <>
-    <div> This is ${REPL_SOCIALDB_CONTRACT} </div> 
+    <div> This is ${REPL_PLACEHOLDER1} </div> 
     <Widget src="${REPL_ACCOUNT}/widget/SomeWidget"> 
-    <div>${REPL_NEAR_URL}</div>
+    <div>${REPL_PLACEHOLDER2}</div>
 </>;
