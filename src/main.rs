@@ -1,7 +1,7 @@
 use clap::Parser;
 use config::Config;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
@@ -9,7 +9,8 @@ use warp::{http::Method, Filter};
 
 #[derive(clap::ValueEnum, Clone, Debug, PartialEq, Eq)]
 enum Network {
-    Testnet, Mainnet
+    Testnet,
+    Mainnet,
 }
 
 #[derive(Parser, Debug)]
@@ -49,13 +50,27 @@ struct AccountPath {
     path: PathBuf,
 }
 
-fn handle_request(account_id: &str, path: PathBuf, replacements_map: &HashMap<String, String>) -> HashMap<String, ComponentCode> {
+fn handle_request(
+    account_id: &str,
+    path: PathBuf,
+    replacements_map: &HashMap<String, String>,
+) -> HashMap<String, ComponentCode> {
     let mut components = HashMap::new();
-    get_file_list(&path, account_id, &mut components, String::from(""), replacements_map);
+    get_file_list(
+        &path,
+        account_id,
+        &mut components,
+        String::from(""),
+        replacements_map,
+    );
     components
 }
 
-fn replace_placeholders(code: &str, account_id: &str, replacements_map: &HashMap<String, String>) -> String {
+fn replace_placeholders(
+    code: &str,
+    account_id: &str,
+    replacements_map: &HashMap<String, String>,
+) -> String {
     let mut replacements = HashMap::clone(replacements_map);
     replacements.insert("${REPL_ACCOUNT}".to_owned(), account_id.to_owned());
 
@@ -68,7 +83,9 @@ fn replace_placeholders(code: &str, account_id: &str, replacements_map: &HashMap
     modified_string
 }
 
-fn read_replacements(path: Option<PathBuf>) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
+fn read_replacements(
+    path: Option<PathBuf>,
+) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
     let path = match path {
         Some(p) => p,
         None => return Ok(HashMap::new()), // Return an empty HashMap if the path is missing
@@ -76,7 +93,7 @@ fn read_replacements(path: Option<PathBuf>) -> Result<HashMap<String, String>, B
 
     let contents = fs::read_to_string(path)?;
     let json: serde_json::Value = serde_json::from_str(&contents)?;
-    
+
     let map: HashMap<String, String> = json
         .as_object()
         .ok_or("Invalid JSON format")?
@@ -102,7 +119,7 @@ fn get_file_list(
     account_id: &str,
     components: &mut HashMap<String, ComponentCode>,
     prefix: String,
-    replacements_map: &HashMap<String, String>
+    replacements_map: &HashMap<String, String>,
 ) {
     let paths = fs::read_dir(path).unwrap();
     for path_res in paths {
@@ -115,7 +132,7 @@ fn get_file_list(
                 account_id,
                 components,
                 prefix.to_owned() + &file_name + ".",
-                replacements_map
+                replacements_map,
             );
             continue;
         }
@@ -145,7 +162,7 @@ async fn main() {
     let account_paths: Vec<AccountPath>;
     if args.use_config {
         let settings = Config::builder()
-            .add_source(config::File::with_name("./.bos-loader").required(false))
+            .add_source(config::File::with_name("./.bos-loader.toml"))
             .build()
             .expect("Failed to load config file");
         account_paths = settings
@@ -163,10 +180,11 @@ async fn main() {
 
     let replacements_path = args.replacements;
     let replacements_map: HashMap<String, String> = match read_replacements(replacements_path) {
-        Ok(m) => { 
-            m
-        }
-        Err(e) => panic!("Something went wrong while parsing the replacement file: {}", e)
+        Ok(m) => m,
+        Err(e) => panic!(
+            "Something went wrong while parsing the replacement file: {}",
+            e
+        ),
     };
 
     let display_paths = account_paths.clone();
@@ -180,7 +198,7 @@ async fn main() {
                 components.extend(handle_request(
                     &account_path.account,
                     account_path.path.to_owned(),
-                    &replacements_map
+                    &replacements_map,
                 ));
             }
             warp::reply::json(&components)
@@ -212,7 +230,9 @@ mod tests {
         let replacements: HashMap<String, String> = vec![
             ("${REPL_PLACEHOLDER1}".to_owned(), "value1".to_owned()),
             ("${REPL_PLACEHOLDER2}".to_owned(), "value2".to_owned()),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
         let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", &replacements);
 
@@ -231,14 +251,17 @@ mod tests {
 
     #[test]
     fn test_replace_placeholders_wrong_notation() {
-        let input_string = String::from("${REPL_ACCOUNT REPL_ACCOUNT $REPL_ACCOUNT ${WRONG_PLACEHOLDER}");
+        let input_string =
+            String::from("${REPL_ACCOUNT REPL_ACCOUNT $REPL_ACCOUNT ${WRONG_PLACEHOLDER}");
         let expected_output = String::from(input_string.clone());
 
         let replacements: HashMap<String, String> = vec![
             ("${REPL_PLACEHOLDER1}".to_owned(), "value1".to_owned()),
             ("${REPL_PLACEHOLDER2}".to_owned(), "value2".to_owned()),
-        ].into_iter().collect();
-        
+        ]
+        .into_iter()
+        .collect();
+
         let modified_string = replace_placeholders(&input_string, "MY_ACCOUNT", &replacements);
 
         assert_eq!(modified_string, expected_output);
@@ -251,18 +274,22 @@ mod tests {
         let expected_output: HashMap<String, String> = vec![
             ("${REPL_PLACEHOLDER1}".to_owned(), "value1".to_owned()),
             ("${REPL_PLACEHOLDER2}".to_owned(), "value2".to_owned()),
-        ].into_iter().collect();
-        
+        ]
+        .into_iter()
+        .collect();
+
         let map = read_replacements(Some(path)).unwrap();
 
         assert_eq!(map, expected_output);
     }
 
     #[test]
-    #[should_panic(expected = "The replacements file can't contain the REPL_ACCOUNT key. This key is reserved.")]
+    #[should_panic(
+        expected = "The replacements file can't contain the REPL_ACCOUNT key. This key is reserved."
+    )]
     fn test_read_replacements_repl_account() {
         let path: PathBuf = "./test/replacements.wrong.json".into();
-        
+
         read_replacements(Some(path)).unwrap();
     }
 }

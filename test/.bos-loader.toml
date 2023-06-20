@@ -1,7 +1,3 @@
-# [paths]
-# near = "./src"
-# "michaelpeter.near" = "./michaelpeter.near"
-
 paths = [
   { account = "near", path = "./components" },
   { account = "michaelpeter.near", path = "./components" },
