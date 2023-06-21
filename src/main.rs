@@ -26,7 +26,7 @@ struct Args {
     /// Path to directory containing component files
     #[clap(short, long, default_value = ".", value_hint = clap::ValueHint::DirPath)]
     path: PathBuf,
-    /// Use config file (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
+    /// Use config file in current dir (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
     #[arg(short = 'c')]
     use_config: bool,
     /// Path to file with replacements map
@@ -292,4 +292,6 @@ mod tests {
 
         read_replacements(Some(path)).unwrap();
     }
+
+    // TODO: add tests for config file multi-account setup
 }
