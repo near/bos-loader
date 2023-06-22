@@ -60,8 +60,11 @@ results in
 }
 ```
 
-The replacements file is an optional file where placeholders and values they should resolve to are specified. The file
-should have the following format:
+## Replacements
+
+The replacements file is an optional file where placeholders and values they should resolve to are specified. Think of replacements as environment variables for your components which are injected before writing the component code on chain
+
+The file should have the following format:
 
 ```json
 {
