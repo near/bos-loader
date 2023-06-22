@@ -1,0 +1,4 @@
+paths = [
+  { account = "near", path = "./components" },
+  { account = "michaelpeter.near", path = "./components" },
+]

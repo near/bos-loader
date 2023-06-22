@@ -27,6 +27,9 @@ Options:
 
           [default: .]
 
+  -r, --replacements <PATH>
+          Path to the file with replacements map
+
   -h, --help
           Print help (see a summary with '-h')
 
@@ -54,9 +57,58 @@ results in
 }
 ```
 
+The replacements file is an optional file where placeholders and values they should resolve to are specified. The file
+should have the following format:
+
+```json
+{
+  "REPL_PLACEHOLDER1": "value1",
+  "REPL_PLACEHOLDER2": "value2"
+}
+```
+
+The placeholders in widgets are replaced with specified values. For example the code for the following widget:
+
+```javascript
+return <>
+    <div> This is ${REPL_PLACEHOLDER1} </div>
+    <Widget src="${REPL_ACCOUNT}/widget/SomeWidget">
+    <div>${REPL_PLACEHOLDER2}</div>
+</>;
+```
+
+will be resolved to:
+
+```javascript
+return <>
+    <div> This is value1 </div>
+    <Widget src="accountId/widget/SomeWidget">
+    <div>value2</div>
+</>;
+```
+
+where accountId is the account passed as an argument.
+
+The file should **not** contain `REPL_ACCOUNT` placeholder. This placeholder is automatically resolved to `accountId` value.
+
 2. Go to https://near.org/flags and set the BOS Loader URL to access your bos-loader instance. The default would be `http://127.0.0.1:3030`
 3. Load the component you would like to preview as `https://near.org/<account id>/widget/<component name>`
    - e.g. from the previous example: `https://near.org/michaelpeter.near/widget/HelloWorld`
+
+## Configuration file
+
+Some advanced options can be configured via a `.bos-loader.toml` file in the directory where you run the loader. The following options are available
+
+### paths
+
+specify multiple accounts and paths to serve components from. You can even serve components from the same directory as multiple accounts
+
+```toml
+paths = [
+  { account = "near", path = "./components" },
+  { account = "michaelpeter.near", path = "./src" },
+]
+```
 
 ## Multi-device Testing
 
