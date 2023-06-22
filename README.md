@@ -15,10 +15,10 @@ see GitHub Releases
 ```sh
 Serves the contents of BOS component files (.jsx) in a specified directory as a JSON object properly formatted for preview on a BOS gateway
 
-Usage: bos-loader [OPTIONS] <ACCOUNT_ID>
+Usage: bos-loader [OPTIONS] [ACCOUNT_ID]
 
 Arguments:
-  <ACCOUNT_ID>
+  [ACCOUNT_ID]
           NEAR account to use as component author in preview
 
 Options:
@@ -27,8 +27,11 @@ Options:
 
           [default: .]
 
-  -r, --replacements <PATH>
-          Path to the file with replacements map
+  -c
+          Use config file in current dir (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
+
+  -r, --replacements <REPLACEMENTS>
+          Path to file with replacements map
 
   -h, --help
           Print help (see a summary with '-h')
