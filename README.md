@@ -60,6 +60,10 @@ results in
 }
 ```
 
+2. Go to https://near.org/flags and set the BOS Loader URL to access your bos-loader instance. The default would be `http://127.0.0.1:3030`
+3. Load the component you would like to preview as `https://near.org/<account id>/widget/<component name>`
+   - e.g. from the previous example: `https://near.org/michaelpeter.near/widget/HelloWorld`
+
 ## Replacements
 
 The replacements file is an optional file where placeholders and values they should resolve to are specified. Think of replacements as environment variables for your components which are injected before writing the component code on chain
@@ -96,10 +100,6 @@ return <>
 where accountId is the account passed as an argument.
 
 The file should **not** contain `REPL_ACCOUNT` placeholder. This placeholder is automatically resolved to `accountId` value.
-
-2. Go to https://near.org/flags and set the BOS Loader URL to access your bos-loader instance. The default would be `http://127.0.0.1:3030`
-3. Load the component you would like to preview as `https://near.org/<account id>/widget/<component name>`
-   - e.g. from the previous example: `https://near.org/michaelpeter.near/widget/HelloWorld`
 
 ## Configuration file
 
