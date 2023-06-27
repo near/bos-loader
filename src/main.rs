@@ -201,7 +201,7 @@ async fn main() {
                     &replacements_map,
                 ));
             }
-            warp::reply::json(&components)
+            warp::reply::json(&FileList { components })
         })
         .with(cors);
 
