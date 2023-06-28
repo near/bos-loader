@@ -8,6 +8,14 @@ Works best when paired with [FroVolod/bos-cli-rs](https://github.com/FroVolod/bo
 
 see GitHub Releases
 
+or..
+
+### From Community Maintain Homebrew (Mac)
+
+```bash
+brew tap empeje/bos-cli && brew install bos-loader
+```
+
 ## Usage
 
 1. Run this tool with desired options
