@@ -16,6 +16,13 @@ or..
 brew tap empeje/bos-cli && brew install bos-loader
 ```
 
+## Compatibility
+Should work without issue when accessing gateway through Chrome, Arc and Firefox.
+
+Brave requires turning shields off for gateway site.
+
+Safari requires serving over HTTPS, which can be accomplished with ngrok. See [this issue](https://github.com/near/bos-loader/issues/9)
+
 ## Usage
 
 1. Run this tool with desired options
