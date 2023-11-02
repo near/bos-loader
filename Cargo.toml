@@ -1,6 +1,6 @@
 [package]
 name = "bos-loader"
-version = "0.7.1"
+version = "0.8.0"
 edition = "2021"
 repository = "https://github.com/mpeterdev/bos-loader"
 description = "Serves BOS component files (.jsx) for preview on a BOS gateway"
