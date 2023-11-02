@@ -29,6 +29,9 @@ struct Args {
     /// Use config file in current dir (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
     #[arg(short = 'c')]
     use_config: bool,
+    /// Run in BOS Web Engine mode
+    #[arg(short = 'w')]
+    web_engine: bool,
     /// Path to file with replacements map
     #[clap(short, long, value_hint = clap::ValueHint::DirPath)]
     replacements: Option<PathBuf>,
@@ -54,6 +57,7 @@ fn handle_request(
     account_id: &str,
     path: PathBuf,
     replacements_map: &HashMap<String, String>,
+    web_engine: &bool,
 ) -> HashMap<String, ComponentCode> {
     let mut components = HashMap::new();
     get_file_list(
@@ -62,6 +66,7 @@ fn handle_request(
         &mut components,
         String::from(""),
         replacements_map,
+        web_engine,
     );
     components
 }
@@ -120,6 +125,7 @@ fn get_file_list(
     components: &mut HashMap<String, ComponentCode>,
     prefix: String,
     replacements_map: &HashMap<String, String>,
+    web_engine: &bool,
 ) {
     let paths = fs::read_dir(path).unwrap();
     for path_res in paths {
@@ -133,6 +139,7 @@ fn get_file_list(
                 components,
                 prefix.to_owned() + &file_name + ".",
                 replacements_map,
+                web_engine,
             );
             continue;
         }
@@ -146,7 +153,8 @@ fn get_file_list(
         }
 
         let fkey = file_key.join(".");
-        let key = format!("{account_id}/widget/{prefix}{fkey}");
+        let join_string = if *web_engine { "/" } else { "/widget/" };
+        let key = format!("{account_id}{join_string}{prefix}{fkey}");
         let mut file = fs::File::open(&file_path).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();
@@ -199,6 +207,7 @@ async fn main() {
                     &account_path.account,
                     account_path.path.to_owned(),
                     &replacements_map,
+                    &args.web_engine,
                 ));
             }
             warp::reply::json(&FileList { components })
