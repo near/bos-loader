@@ -39,11 +39,14 @@ Arguments:
 Options:
   -p, --path <PATH>
           Path to directory containing component files
-
+          
           [default: .]
 
   -c
           Use config file in current dir (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
+
+  -w
+          Run in BOS Web Engine mode
 
   -r, --replacements <REPLACEMENTS>
           Path to file with replacements map
