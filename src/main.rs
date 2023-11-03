@@ -148,7 +148,7 @@ fn get_file_list(
 
         match extension {
             Some("jsx") => {}
-            // Some("tsx") => {} // enable once tsx is supported
+            Some("tsx") => {}
             _ => continue,
         }
 
@@ -220,7 +220,7 @@ async fn main() {
         .collect::<Vec<String>>()
         .join("\n");
     println!(
-        "\nServing .jsx files on http://127.0.0.1:3030\n\n{}",
+        "\nServing .jsx/.tsx files on http://127.0.0.1:3030\n\n{}",
         display_paths_str
     );
 
