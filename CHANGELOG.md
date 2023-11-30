@@ -1,4 +1,7 @@
 # Changelog
+## 0.10.0
+
+Add argument for specifying port to serve on
 
 ## 0.6.0
 
