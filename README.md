@@ -48,6 +48,11 @@ Options:
   -w
           Run in BOS Web Engine mode
 
+      --port <PORT>
+          Port to serve on
+          
+          [default: 3030]
+
   -r, --replacements <REPLACEMENTS>
           Path to file with replacements map
 
@@ -152,3 +157,19 @@ region: us
 ```
 
 Then start with `ngrok start --all`
+
+## Contributing
+
+### Cutting a new release
+
+Once all changes are merged into `main`, use `cargo release` to cut a new release. This will automatically update the version in `Cargo.toml`, create a new git tag, and push the tag to GitHub.
+
+Given the next release version will be `0.9.0`
+
+```bash
+# dry run to make sure everything looks normal
+cargo release 0.9.0
+
+# execute the release
+cargo release 0.9.0 --execute
+```

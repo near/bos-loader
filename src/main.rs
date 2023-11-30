@@ -32,6 +32,9 @@ struct Args {
     /// Run in BOS Web Engine mode
     #[arg(short = 'w')]
     web_engine: bool,
+    /// Port to serve on
+    #[arg(long, default_value = "3030")]
+    port: u16,
     /// Path to file with replacements map
     #[clap(short, long, value_hint = clap::ValueHint::DirPath)]
     replacements: Option<PathBuf>,
@@ -220,11 +223,11 @@ async fn main() {
         .collect::<Vec<String>>()
         .join("\n");
     println!(
-        "\nServing .jsx/.tsx files on http://127.0.0.1:3030\n\n{}",
-        display_paths_str
+        "\nServing .jsx/.tsx files on http://127.0.0.1:{}\n\n{}",
+        args.port, display_paths_str
     );
 
-    warp::serve(api).run(([127, 0, 0, 1], 3030)).await;
+    warp::serve(api).run(([127, 0, 0, 1], args.port)).await;
 }
 
 #[cfg(test)]
