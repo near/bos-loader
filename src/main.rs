@@ -228,7 +228,7 @@ async fn main() {
             .expect("A valid path configuration was not found in config file")
     } else {
         vec![AccountPath {
-            path: path,
+            path,
             account_id: account_id
                 .expect("Account ID must be provided when not using configuration file"),
         }]
@@ -261,7 +261,6 @@ async fn main() {
     let api = warp::get()
         .and_then(move || {
             let account_paths = account_paths.clone();
-            let web_engine = web_engine.clone();
             let replacements_map = replacements_map.clone();
 
             async move {
