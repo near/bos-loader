@@ -26,7 +26,7 @@ Usage: bos-loader [OPTIONS] [ACCOUNT_ID]
 
 Arguments:
   [ACCOUNT_ID]
-          NEAR account to use as component author in preview
+          NEAR account id to use as component author in preview
 
 Options:
   -p, --path <PATH>
@@ -55,7 +55,7 @@ Options:
           Print version
 ```
 
-The only required argument is the account which you want to serve the components from
+The only required argument is the account id which you want to serve the components from
 
 e.g. running from a directory with `HelloWorld.jsx` in the following way
 
@@ -112,7 +112,7 @@ return <>
 </>;
 ```
 
-where accountId is the account passed as an argument.
+where accountId is the account id passed as an argument.
 
 The file should **not** contain `REPL_ACCOUNT` placeholder. This placeholder is automatically resolved to `accountId` value.
 
@@ -126,8 +126,8 @@ specify multiple accounts and paths to serve components from. You can even serve
 
 ```toml
 paths = [
-  { account = "near", path = "./components" },
-  { account = "michaelpeter.near", path = "./src" },
+  { account_id = "near", path = "./components" },
+  { account_id = "michaelpeter.near", path = "./src" },
 ]
 ```
 

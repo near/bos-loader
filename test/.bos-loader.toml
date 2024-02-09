@@ -1,4 +1,4 @@
 paths = [
-  { account = "near", path = "./components" },
-  { account = "michaelpeter.near", path = "./components" },
+  { account_id = "near", path = "./components" },
+  { account_id = "michaelpeter.near", path = "./components" },
 ]
