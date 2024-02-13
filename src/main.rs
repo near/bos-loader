@@ -1,17 +1,12 @@
+use anyhow::anyhow;
+use async_recursion::async_recursion;
 use clap::Parser;
 use config::Config;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fs;
-use std::io::Read;
-use std::path::PathBuf;
+use serde_json::json;
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use tokio::{fs, io::AsyncReadExt, sync::Mutex};
 use warp::{http::Method, Filter};
-
-#[derive(clap::ValueEnum, Clone, Debug, PartialEq, Eq)]
-enum Network {
-    Testnet,
-    Mainnet,
-}
 
 #[derive(Parser, Debug)]
 #[command(
@@ -21,20 +16,20 @@ enum Network {
     long_about = "Serves the contents of BOS component files (.jsx) in a specified directory as a JSON object properly formatted for preview on a BOS gateway"
 )]
 struct Args {
-    /// NEAR account to use as component author in preview
-    account_id: Option<String>,
     /// Path to directory containing component files
     #[clap(short, long, default_value = ".", value_hint = clap::ValueHint::DirPath)]
     path: PathBuf,
-    /// Use config file in current dir (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
+    /// Port to serve on
+    #[arg(long, default_value = "3030")]
+    port: u16,
+    /// NEAR account to use as component author in preview
+    account: Option<String>,
+    /// Use config file in current dir (./.bos-loader.toml) to set account and path, causes other args to be ignored
     #[arg(short = 'c')]
     use_config: bool,
     /// Run in BOS Web Engine mode
     #[arg(short = 'w')]
     web_engine: bool,
-    /// Port to serve on
-    #[arg(long, default_value = "3030")]
-    port: u16,
     /// Path to file with replacements map
     #[clap(short, long, value_hint = clap::ValueHint::DirPath)]
     replacements: Option<PathBuf>,
@@ -45,189 +40,274 @@ struct FileList {
     components: HashMap<String, ComponentCode>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct ComponentCode {
     code: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 struct AccountPath {
-    account: String,
     path: PathBuf,
+    account: String,
 }
 
-fn handle_request(
-    account_id: &str,
+struct HandleRequestOptions {
     path: PathBuf,
-    replacements_map: &HashMap<String, String>,
-    web_engine: &bool,
-) -> HashMap<String, ComponentCode> {
-    let mut components = HashMap::new();
-    get_file_list(
-        &path,
-        account_id,
-        &mut components,
-        String::from(""),
-        replacements_map,
+    account: String,
+    web_engine: bool,
+    replacements_map: Arc<HashMap<String, String>>,
+}
+
+async fn handle_request(
+    HandleRequestOptions {
+        path,
+        account,
         web_engine,
-    );
-    components
+        replacements_map,
+    }: HandleRequestOptions,
+) -> Result<Arc<Mutex<HashMap<String, ComponentCode>>>, anyhow::Error> {
+    let components = Arc::new(Mutex::new(HashMap::new()));
+
+    load_components(LoadComponentsOptions {
+        path,
+        account,
+        prefix: "".to_string(),
+        web_engine,
+        components: components.clone(),
+        replacements_map,
+    })
+    .await?;
+
+    Ok(components)
 }
 
 fn replace_placeholders(
     code: &str,
-    account_id: &str,
+    account: &str,
     replacements_map: &HashMap<String, String>,
 ) -> String {
-    let mut replacements = HashMap::clone(replacements_map);
-    replacements.insert("${REPL_ACCOUNT}".to_owned(), account_id.to_owned());
+    let mut modified_string = code.to_string();
+    let mut replacements = replacements_map.clone();
+    replacements.insert("${REPL_ACCOUNT}".to_owned(), account.to_owned());
 
-    let mut modified_string = String::from(code);
-
-    for (substring, value) in replacements {
-        modified_string = modified_string.replace(substring.as_str(), value.as_str());
+    for (substring, value) in replacements.iter() {
+        modified_string = modified_string.replace(substring, value);
     }
 
     modified_string
 }
 
-fn read_replacements(
-    path: Option<PathBuf>,
-) -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
-    let path = match path {
-        Some(p) => p,
-        None => return Ok(HashMap::new()), // Return an empty HashMap if the path is missing
-    };
+async fn read_replacements(path: PathBuf) -> Result<Arc<HashMap<String, String>>, anyhow::Error> {
+    let contents = fs::read_to_string(&path)
+        .await
+        .map_err(|err| anyhow!("Failed to read path {:?} \n Error: {:?}", path, err))?;
 
-    let contents = fs::read_to_string(path)?;
-    let json: serde_json::Value = serde_json::from_str(&contents)?;
-
-    let map: HashMap<String, String> = json
-        .as_object()
-        .ok_or("Invalid JSON format")?
+    let map = serde_json::from_str::<HashMap<String, String>>(&contents)
+        .map_err(|_| anyhow!("Invalid JSON format"))?
         .iter()
-        .filter_map(|(k, v)| {
-            if let serde_json::Value::String(v) = v {
-                let key = format!("{}{}{}", "${", k, "}");
-                Some((key, v.clone()))
-            } else {
-                None
-            }
-        })
-        .collect();
+        .map(|(key, value)| (format!("{}{}{}", "${", key, "}"), value.to_owned()))
+        .collect::<HashMap<String, String>>();
+
     if map.contains_key("${REPL_ACCOUNT}") {
-        panic!("The replacements file can't contain the REPL_ACCOUNT key. This key is reserved.")
+        panic!("The replacements file can't contain the REPL_ACCOUNT key. This key is reserved.");
     }
 
-    Ok(map)
+    Ok(Arc::new(map))
 }
 
-fn get_file_list(
-    path: &PathBuf,
-    account_id: &str,
-    components: &mut HashMap<String, ComponentCode>,
+struct LoadComponentsOptions {
+    path: PathBuf,
     prefix: String,
-    replacements_map: &HashMap<String, String>,
-    web_engine: &bool,
-) {
-    let paths = fs::read_dir(path).unwrap();
-    for path_res in paths {
-        let path = path_res.unwrap();
-        let file_path = path.path();
-        let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
-        if path.file_type().unwrap().is_dir() {
-            get_file_list(
-                &file_path,
-                account_id,
-                components,
-                prefix.to_owned() + &file_name + ".",
-                replacements_map,
+    account: String,
+    web_engine: bool,
+    components: Arc<Mutex<HashMap<String, ComponentCode>>>,
+    replacements_map: Arc<HashMap<String, String>>,
+}
+
+#[async_recursion]
+async fn load_components(
+    LoadComponentsOptions {
+        path,
+        prefix,
+        account,
+        web_engine,
+        components,
+        replacements_map,
+    }: LoadComponentsOptions,
+) -> Result<(), anyhow::Error> {
+    let mut paths = fs::read_dir(path.clone())
+        .await
+        .map_err(|err| anyhow!("Could not read directory {:?} \n Error: {:?}", path, err))?;
+
+    while let Some(directory_entry) = paths.next_entry().await.map_err(|err| {
+        anyhow!(
+            "Could not read directory entries for path {:?} \n Error: {:?}",
+            path,
+            err
+        )
+    })? {
+        let file_path = directory_entry.path();
+        let file_name = file_path
+            .file_name()
+            .ok_or(anyhow!("Could not get file name from path {:?}", file_path))?
+            .to_string_lossy()
+            .to_string();
+
+        if directory_entry
+            .file_type()
+            .await
+            .map_err(|err| {
+                anyhow!(
+                    "Could not get file type from path {:?} \n Error: {:?}",
+                    file_path,
+                    err
+                )
+            })?
+            .is_dir()
+        {
+            load_components(LoadComponentsOptions {
+                path: file_path,
+                account: account.clone(),
+                prefix: format!("{prefix}{file_name}."),
                 web_engine,
-            );
+                components: components.clone(),
+                replacements_map: replacements_map.clone(),
+            })
+            .await?;
+
             continue;
         }
-        let mut file_key: Vec<&str> = file_name.split('.').collect();
-        let extension = file_key.pop();
 
-        match extension {
-            Some("jsx") => {}
-            Some("tsx") => {}
-            _ => continue,
+        let mut file_name_parts: Vec<&str> = file_name.split('.').collect();
+
+        if let Some(extension) = file_name_parts.pop() {
+            if extension != "jsx" && extension != "tsx" {
+                continue;
+            }
         }
 
-        let fkey = file_key.join(".");
-        let join_string = if *web_engine { "/" } else { "/widget/" };
-        let key = format!("{account_id}{join_string}{prefix}{fkey}");
-        let mut file = fs::File::open(&file_path).unwrap();
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).unwrap();
-        contents = replace_placeholders(contents.as_str(), account_id, replacements_map);
-        components.insert(key, ComponentCode { code: contents });
+        let file_key = file_name_parts.join(".");
+        let join_string = if web_engine { "/" } else { "/widget/" };
+        let key = format!("{account}{join_string}{prefix}{file_key}");
+
+        let mut code = String::new();
+        let mut file = fs::File::open(&file_path)
+            .await
+            .map_err(|err| anyhow!("Failed to open file {:?} \n Error: {:?}", file_path, err))?;
+
+        file.read_to_string(&mut code)
+            .await
+            .map_err(|err| anyhow!("Failed to read file {:?} \n Error: {:?}", file_path, err))?;
+
+        code = replace_placeholders(&code, &account, &replacements_map.clone());
+        components.lock().await.insert(key, ComponentCode { code });
     }
+
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() {
-    let args = Args::parse();
+    let Args {
+        path,
+        port,
+        account,
+        use_config,
+        web_engine,
+        replacements,
+    } = Args::parse();
 
-    let account_paths: Vec<AccountPath>;
-    if args.use_config {
+    let account_paths = if use_config {
         let settings = Config::builder()
             .add_source(config::File::with_name("./.bos-loader.toml"))
             .build()
             .expect("Failed to load config file");
-        account_paths = settings
-            .get::<Vec<AccountPath>>("paths")
-            .expect("A valid path configuration was not found in config file");
-    } else {
-        account_paths = vec![AccountPath {
-            account: args
-                .account_id
-                .expect("Account ID must be provided when not using configuration file")
-                .clone(),
-            path: args.path.clone(),
-        }];
-    }
 
-    let replacements_path = args.replacements;
-    let replacements_map: HashMap<String, String> = match read_replacements(replacements_path) {
-        Ok(m) => m,
-        Err(e) => panic!(
-            "Something went wrong while parsing the replacement file: {}",
-            e
-        ),
+        settings
+            .get::<Vec<AccountPath>>("paths")
+            .expect("A valid path configuration was not found in config file")
+    } else {
+        vec![AccountPath {
+            path,
+            account: account
+                .expect("Account ID must be provided when not using configuration file"),
+        }]
     };
 
-    let display_paths = account_paths.clone();
+    let replacements_map = if let Some(replacements_path) = replacements {
+        read_replacements(replacements_path)
+            .await
+            .map_err(|err| {
+                format!(
+                    "Something went wrong while parsing the replacement file: {}",
+                    err
+                )
+            })
+            .unwrap()
+    } else {
+        Arc::new(HashMap::new())
+    };
+
+    let display_paths_str = account_paths
+        .iter()
+        .map(|AccountPath { path, account }| format!("{:?} as account {}", path, account))
+        .collect::<Vec<String>>()
+        .join("\n");
+
     let cors = warp::cors()
         .allow_any_origin()
         .allow_methods(&[Method::GET]);
+
     let api = warp::get()
-        .map(move || {
-            let mut components: HashMap<String, ComponentCode> = HashMap::new();
-            for account_path in account_paths.iter() {
-                components.extend(handle_request(
-                    &account_path.account,
-                    account_path.path.to_owned(),
-                    &replacements_map,
-                    &args.web_engine,
-                ));
+        .and_then(move || {
+            let account_paths = account_paths.clone();
+            let replacements_map = replacements_map.clone();
+
+            async move {
+                let mut all_components = HashMap::new();
+
+                for AccountPath { path, account } in account_paths {
+                    match handle_request(HandleRequestOptions {
+                        path: path.clone(),
+                        web_engine,
+                        account: account.clone(),
+                        replacements_map: replacements_map.clone(),
+                    })
+                    .await
+                    {
+                        Ok(components) => {
+                            let components_lock = components.lock().await;
+
+                            all_components.extend(components_lock.clone());
+                        }
+                        Err(err) => {
+                            let error = format!(
+                                "Error handling request for account {}, path {:?} \n Error: {:?}",
+                                account, path, err
+                            );
+
+                            println!("{error}");
+
+                            return Ok::<_, warp::Rejection>(warp::reply::json(&json!({
+                                "error": error,
+                            })));
+                        }
+                    }
+                }
+
+                Ok(warp::reply::json(&FileList {
+                    components: all_components,
+                }))
             }
-            warp::reply::json(&FileList { components })
         })
         .with(cors);
 
-    let display_paths_str = display_paths
-        .iter()
-        .map(|ap| format!("{} as account {}", ap.path.to_string_lossy(), ap.account))
-        .collect::<Vec<String>>()
-        .join("\n");
     println!(
         "\nServing .jsx/.tsx files on http://127.0.0.1:{}\n\n{}",
-        args.port, display_paths_str
+        port, display_paths_str
     );
 
-    warp::serve(api).run(([127, 0, 0, 1], args.port)).await;
+    warp::serve(api).run(([127, 0, 0, 1], port)).await;
 }
 
 #[cfg(test)]
@@ -279,8 +359,8 @@ mod tests {
         assert_eq!(modified_string, expected_output);
     }
 
-    #[test]
-    fn test_read_replacements() {
+    #[tokio::test]
+    async fn test_read_replacements() {
         let path: PathBuf = "./test/replacements.json".into();
 
         let expected_output: HashMap<String, String> = vec![
@@ -290,19 +370,19 @@ mod tests {
         .into_iter()
         .collect();
 
-        let map = read_replacements(Some(path)).unwrap();
+        let map = read_replacements(path).await.unwrap();
 
-        assert_eq!(map, expected_output);
+        assert_eq!(map, expected_output.into());
     }
 
-    #[test]
+    #[tokio::test]
     #[should_panic(
         expected = "The replacements file can't contain the REPL_ACCOUNT key. This key is reserved."
     )]
-    fn test_read_replacements_repl_account() {
+    async fn test_read_replacements_repl_account() {
         let path: PathBuf = "./test/replacements.wrong.json".into();
 
-        read_replacements(Some(path)).unwrap();
+        read_replacements(path).await.unwrap();
     }
 
     // TODO: add tests for config file multi-account setup
