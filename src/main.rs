@@ -23,8 +23,8 @@ struct Args {
     #[arg(long, default_value = "3030")]
     port: u16,
     /// NEAR account to use as component author in preview
-    account_id: Option<String>,
-    /// Use config file in current dir (./.bos-loader.toml) to set account_id and path, causes other args to be ignored
+    account: Option<String>,
+    /// Use config file in current dir (./.bos-loader.toml) to set account and path, causes other args to be ignored
     #[arg(short = 'c')]
     use_config: bool,
     /// Run in BOS Web Engine mode
@@ -48,21 +48,21 @@ struct ComponentCode {
 #[derive(Serialize, Deserialize, Clone)]
 struct AccountPath {
     path: PathBuf,
-    account_id: String,
+    account: String,
 }
 
 struct HandleRequestOptions {
     path: PathBuf,
+    account: String,
     web_engine: bool,
-    account_id: String,
     replacements_map: Arc<HashMap<String, String>>,
 }
 
 async fn handle_request(
     HandleRequestOptions {
         path,
+        account,
         web_engine,
-        account_id,
         replacements_map,
     }: HandleRequestOptions,
 ) -> Result<Arc<Mutex<HashMap<String, ComponentCode>>>, anyhow::Error> {
@@ -70,7 +70,7 @@ async fn handle_request(
 
     load_components(LoadComponentsOptions {
         path,
-        account_id,
+        account,
         prefix: "".to_string(),
         web_engine,
         components: components.clone(),
@@ -83,12 +83,12 @@ async fn handle_request(
 
 fn replace_placeholders(
     code: &str,
-    account_id: &str,
+    account: &str,
     replacements_map: &HashMap<String, String>,
 ) -> String {
     let mut modified_string = code.to_string();
     let mut replacements = replacements_map.clone();
-    replacements.insert("${REPL_ACCOUNT}".to_owned(), account_id.to_owned());
+    replacements.insert("${REPL_ACCOUNT}".to_owned(), account.to_owned());
 
     for (substring, value) in replacements.iter() {
         modified_string = modified_string.replace(substring, value);
@@ -118,8 +118,8 @@ async fn read_replacements(path: PathBuf) -> Result<Arc<HashMap<String, String>>
 struct LoadComponentsOptions {
     path: PathBuf,
     prefix: String,
+    account: String,
     web_engine: bool,
-    account_id: String,
     components: Arc<Mutex<HashMap<String, ComponentCode>>>,
     replacements_map: Arc<HashMap<String, String>>,
 }
@@ -129,8 +129,8 @@ async fn load_components(
     LoadComponentsOptions {
         path,
         prefix,
+        account,
         web_engine,
-        account_id,
         components,
         replacements_map,
     }: LoadComponentsOptions,
@@ -167,7 +167,7 @@ async fn load_components(
         {
             load_components(LoadComponentsOptions {
                 path: file_path,
-                account_id: account_id.clone(),
+                account: account.clone(),
                 prefix: format!("{prefix}{file_name}."),
                 web_engine,
                 components: components.clone(),
@@ -188,7 +188,7 @@ async fn load_components(
 
         let file_key = file_name_parts.join(".");
         let join_string = if web_engine { "/" } else { "/widget/" };
-        let key = format!("{account_id}{join_string}{prefix}{file_key}");
+        let key = format!("{account}{join_string}{prefix}{file_key}");
 
         let mut code = String::new();
         let mut file = fs::File::open(&file_path)
@@ -199,7 +199,7 @@ async fn load_components(
             .await
             .map_err(|err| anyhow!("Failed to read file {:?} \n Error: {:?}", file_path, err))?;
 
-        code = replace_placeholders(&code, &account_id, &replacements_map.clone());
+        code = replace_placeholders(&code, &account, &replacements_map.clone());
         components.lock().await.insert(key, ComponentCode { code });
     }
 
@@ -209,7 +209,7 @@ async fn load_components(
 #[tokio::main]
 async fn main() {
     let Args {
-        account_id,
+        account,
         path,
         use_config,
         web_engine,
@@ -229,7 +229,7 @@ async fn main() {
     } else {
         vec![AccountPath {
             path,
-            account_id: account_id
+            account: account
                 .expect("Account ID must be provided when not using configuration file"),
         }]
     };
@@ -250,7 +250,7 @@ async fn main() {
 
     let display_paths_str = account_paths
         .iter()
-        .map(|AccountPath { path, account_id }| format!("{:?} as account {}", path, account_id))
+        .map(|AccountPath { path, account }| format!("{:?} as account {}", path, account))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -266,11 +266,11 @@ async fn main() {
             async move {
                 let mut all_components = HashMap::new();
 
-                for AccountPath { path, account_id } in account_paths {
+                for AccountPath { path, account } in account_paths {
                     match handle_request(HandleRequestOptions {
                         path: path.clone(),
                         web_engine,
-                        account_id: account_id.clone(),
+                        account: account.clone(),
                         replacements_map: replacements_map.clone(),
                     })
                     .await
@@ -282,8 +282,8 @@ async fn main() {
                         }
                         Err(err) => {
                             let error = format!(
-                                "Error handling request for account_id {}, path {:?} \n Error: {:?}",
-                                account_id, path, err
+                                "Error handling request for account {}, path {:?} \n Error: {:?}",
+                                account, path, err
                             );
 
                             println!("{error}");
