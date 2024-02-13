@@ -209,11 +209,11 @@ async fn load_components(
 #[tokio::main]
 async fn main() {
     let Args {
-        account,
         path,
+        port,
+        account,
         use_config,
         web_engine,
-        port,
         replacements,
     } = Args::parse();
 
