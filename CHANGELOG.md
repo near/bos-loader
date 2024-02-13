@@ -1,4 +1,8 @@
 # Changelog
+
+## 0.11.0
+Refactor and improved error handling by @robertlopezdev
+
 ## 0.10.0
 
 Add argument for specifying port to serve on
