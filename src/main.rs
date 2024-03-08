@@ -43,7 +43,8 @@ struct FileList {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct ComponentCode {
     code: String,
-    css: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    css: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -204,25 +205,36 @@ async fn load_components(
         code = replace_placeholders(&code, &account, &replacements_map.clone());
 
         // read css
-        let mut css = String::new();
-        let css_path = file_path.with_extension("module.css");
-        if css_path.exists() {
-            let mut css_file = fs::File::open(&css_path)
-                .await
-                .map_err(|err| anyhow!("Failed to open file {:?} \n Error: {:?}", css_path, err))?;
+        let css: Option<String> = if web_engine {
+            let css_path = file_path.with_extension("module.css");
+            if css_path.exists() {
+                let mut css_file = fs::File::open(&css_path).await.map_err(|err| {
+                    anyhow!("Failed to open file {:?} \n Error: {:?}", css_path, err)
+                })?;
 
-            css_file
-                .read_to_string(&mut css)
-                .await
-                .map_err(|err| anyhow!("Failed to read file {:?} \n Error: {:?}", css_path, err))?;
+                let mut read_css = String::new();
+                css_file
+                    .read_to_string(&mut read_css)
+                    .await
+                    .map_err(|err| {
+                        anyhow!("Failed to read file {:?} \n Error: {:?}", css_path, err)
+                    })?;
+
+                Some(read_css)
+            } else {
+                Some(String::from(""))
+            }
         } else {
-            css = String::from("");
-        }
+            None
+        };
 
-        components
-            .lock()
-            .await
-            .insert(key, ComponentCode { code, css });
+        components.lock().await.insert(
+            key,
+            ComponentCode {
+                code,
+                css: if web_engine { css } else { None },
+            },
+        );
     }
 
     Ok(())
@@ -431,7 +443,7 @@ mod tests {
                 code: String::from(
                     "import s from \"./WithStyle.module.css\";\n\ntype Props = {\n  message?: string;\n};\n\nfunction WithStyle({ message = \"Hello!\" }: Props) {\n  return (\n    <div className={s.wrapper}>\n      <p>{message}</p>\n    </div>\n  );\n}\n\nexport default WithStyle as BWEComponent<Props>;\n"
                 ),
-                css: String::from(".wrapper {\n  color: rebeccapurple;\n}")
+                css: Some(String::from(".wrapper {\n  color: rebeccapurple;\n}"))
             })
         );
         assert_eq!(
@@ -440,7 +452,7 @@ mod tests {
                 code: String::from(
                     "type Props = {\n  message?: string;\n};\n\nfunction NoStyle({ message = \"Hello!\" }: Props) {\n  return (\n    <div>\n      <p>{message}</p>\n    </div>\n  );\n}\n\nexport default NoStyle as BWEComponent<Props>;\n"
                 ),
-                css: String::from("")
+                css: Some(String::from(""))
             })
         );
     }
