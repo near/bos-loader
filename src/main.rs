@@ -40,9 +40,10 @@ struct FileList {
     components: HashMap<String, ComponentCode>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 struct ComponentCode {
     code: String,
+    css: String,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -190,6 +191,7 @@ async fn load_components(
         let join_string = if web_engine { "/" } else { "/widget/" };
         let key = format!("{account}{join_string}{prefix}{file_key}");
 
+        // read code
         let mut code = String::new();
         let mut file = fs::File::open(&file_path)
             .await
@@ -200,7 +202,27 @@ async fn load_components(
             .map_err(|err| anyhow!("Failed to read file {:?} \n Error: {:?}", file_path, err))?;
 
         code = replace_placeholders(&code, &account, &replacements_map.clone());
-        components.lock().await.insert(key, ComponentCode { code });
+
+        // read css
+        let mut css = String::new();
+        let css_path = file_path.with_extension("module.css");
+        if css_path.exists() {
+            let mut css_file = fs::File::open(&css_path)
+                .await
+                .map_err(|err| anyhow!("Failed to open file {:?} \n Error: {:?}", css_path, err))?;
+
+            css_file
+                .read_to_string(&mut css)
+                .await
+                .map_err(|err| anyhow!("Failed to read file {:?} \n Error: {:?}", css_path, err))?;
+        } else {
+            css = String::from("");
+        }
+
+        components
+            .lock()
+            .await
+            .insert(key, ComponentCode { code, css });
     }
 
     Ok(())
@@ -383,6 +405,44 @@ mod tests {
         let path: PathBuf = "./test/replacements.wrong.json".into();
 
         read_replacements(path).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_basic_web_engine_components() {
+        let path: PathBuf = "./test/webengine".into();
+        let account = "test.near".to_string();
+        let web_engine = true;
+        let replacements_map = Arc::new(HashMap::new());
+
+        let components = handle_request(HandleRequestOptions {
+            path,
+            account,
+            web_engine,
+            replacements_map,
+        })
+        .await
+        .unwrap();
+
+        let components_lock = components.lock().await;
+
+        assert_eq!(
+            components_lock.get("test.near/WithStyle"),
+            Some(&ComponentCode {
+                code: String::from(
+                    "import s from \"./WithStyle.module.css\";\n\ntype Props = {\n  message?: string;\n};\n\nfunction WithStyle({ message = \"Hello!\" }: Props) {\n  return (\n    <div className={s.wrapper}>\n      <p>{message}</p>\n    </div>\n  );\n}\n\nexport default WithStyle as BWEComponent<Props>;\n"
+                ),
+                css: String::from(".wrapper {\n  color: rebeccapurple;\n}")
+            })
+        );
+        assert_eq!(
+            components_lock.get("test.near/NoStyle"),
+            Some(&ComponentCode {
+                code: String::from(
+                    "type Props = {\n  message?: string;\n};\n\nfunction NoStyle({ message = \"Hello!\" }: Props) {\n  return (\n    <div>\n      <p>{message}</p>\n    </div>\n  );\n}\n\nexport default NoStyle as BWEComponent<Props>;\n"
+                ),
+                css: String::from("")
+            })
+        );
     }
 
     // TODO: add tests for config file multi-account setup
