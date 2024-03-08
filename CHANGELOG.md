@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.12.0
+Add support for serving CSS modules when operating in BOS Web Engine mode
+
 ## 0.11.0
 Refactor and improved error handling by @robertlopezdev
 
