@@ -165,3 +165,22 @@ cargo release 0.9.0
 # execute the release
 cargo release 0.9.0 --execute
 ```
+
+## Troubleshooting
+
+### Mac OS
+
+If you've installed a new version of `bos-loader` on Mac OS, it's possible you could see the following `killed` response when running any command:
+
+```
+$ bos-loader --version
+[1]    32008 killed     bos-loader --version
+```
+
+To fix this, you'll need to follow these steps in order:
+
+1. Remove the executable: `rm ~/.cargo/bin/bos-loader`
+2. Restart your computer
+3. Re-install `bos-loader` using the command provided by the latest release notes.
+
+After following these steps, `bos-loader` should be able to execute without issue. This process resets the kernel cache for the executable.
